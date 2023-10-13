@@ -27,7 +27,6 @@
 #include "utilities.hpp"
 #include "parser.hpp"
 
-using std::string;
 using namespace wi;
 
 int main() {
@@ -96,7 +95,7 @@ int main() {
 
         std::cout << ps.to_string() << std::endl;
 
-    } catch (string s) {
+    } catch (std::string s) {
         std::cout << s << std::endl;
     }
     return 0;
