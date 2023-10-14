@@ -21,7 +21,7 @@
 ################################################################################
 
 CPP=g++
-CFLAGS=-Wall -Wextra -O2 -std=c++17 -Ilib/
+CFLAGS=-Wall -Wextra -O2 -std=c++17 -lm -Ilib/
 
 default: test # Example file
 
