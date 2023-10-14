@@ -34,7 +34,8 @@ class many_parser_t;
 class many1_parser_t;
 class between_parser_t;
 class separated_by_parser_t;
-class exact_string_parser_t;
+class string_parser_t;
+class choice_of_string_parser_t;
 class char_parser_t;
 class letter_parser_t;
 class digit_parser_t;
@@ -271,11 +272,27 @@ public:
 // -----
 
 
-class exact_string_parser_t : public parser_t {
+class string_parser_t : public parser_t {
     std::string s;
 
 public:
-    exact_string_parser_t(std::string _s);
+    string_parser_t();
+    string_parser_t(std::string _s);
+    parser_state_t run(parser_state_t parser_state) const;
+
+    string_parser_t& set_string(std::string _s);
+};
+
+
+// -----
+
+
+class choice_of_string_parser_t : public parser_t {
+    std::vector<std::string> words;
+
+public:
+    choice_of_string_parser_t();
+    choice_of_string_parser_t(std::vector<std::string> _words);
     parser_state_t run(parser_state_t parser_state) const;
 };
 

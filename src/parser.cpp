@@ -498,11 +498,15 @@ separated_by_parser_t& separated_by_parser_t::set_value_parser(parser_t* _value_
 // -----
 
 
-exact_string_parser_t::exact_string_parser_t(std::string _s)
+string_parser_t::string_parser_t()
+: s()
+{}
+
+string_parser_t::string_parser_t(std::string _s)
 : s(_s)
 {}
 
-parser_state_t exact_string_parser_t::run(parser_state_t parser_state) const
+parser_state_t string_parser_t::run(parser_state_t parser_state) const
 {
     if (parser_state.is_error)
         return parser_state;
@@ -511,7 +515,7 @@ parser_state_t exact_string_parser_t::run(parser_state_t parser_state) const
         return parser_state
             .set_result("")
             .set_is_error(true)
-            .set_error("exact_string_parser_t::run(): Unexpected end of string");
+            .set_error("string_parser_t::run(): Unexpected end of string");
     }
 
     if (string_starts_with(parser_state.target_string, this->s, parser_state.index)) {
@@ -524,7 +528,44 @@ parser_state_t exact_string_parser_t::run(parser_state_t parser_state) const
     return parser_state
         .set_result("")
         .set_is_error(true)
-        .set_error("exact_string_parser_t::run(): Couldn't match \"" + this->s + "\" in \"" + string_at_most<true>(parser_state.target_string, 10, parser_state.index) + "\"");
+        .set_error("string_parser_t::run(): Couldn't match \"" + this->s + "\" in \"" + string_at_most<true>(parser_state.target_string, 10, parser_state.index) + "\"");
+}
+
+string_parser_t& string_parser_t::set_string(std::string _s)
+{
+    s = _s;
+    return *this;
+}
+
+
+// -----
+
+
+choice_of_string_parser_t::choice_of_string_parser_t()
+: words()
+{}
+
+choice_of_string_parser_t::choice_of_string_parser_t(std::vector<std::string> _words)
+: words(_words)
+{}
+
+parser_state_t choice_of_string_parser_t::run(parser_state_t parser_state) const
+{
+    if (parser_state.is_error)
+        return parser_state;
+
+    string_parser_t parser;
+
+    for (const std::string& word : this->words) {
+        parser_state_t next_state = parser.set_string(word).run(parser_state);
+        if (!next_state.is_error)
+            return next_state;
+    }
+
+    return parser_state
+        .set_result("")
+        .set_is_error(true)
+        .set_error("choice_of_string_parser_t::run(): Unable to match with any parser the string \"" + string_at_most(parser_state.target_string, 10, parser_state.index) + "\"");
 }
 
 

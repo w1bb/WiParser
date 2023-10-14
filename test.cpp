@@ -28,11 +28,15 @@
 #include "utilities.hpp"
 #include "parser.hpp"
 
-using namespace wi;
+
+// -----
+
 
 // This example parses a LISP-like mathematical expression and converts it into
 // its numerical value.
-void example_1() {
+void example_lisp() {
+    using namespace wi;
+    
     parser_state_t init_parser_state("[% (* 2 (- [+ 8 2] (pow 2 2))) 5]");
 
     lazy_parser_t *p_lazy_function = new lazy_parser_t();
@@ -52,14 +56,7 @@ void example_1() {
             new char_parser_t(std::regex(R"([\)\]])"))
         }),
         new sequence_of_parser_t({
-            new choice_of_parser_t({
-                new exact_string_parser_t("+"),
-                new exact_string_parser_t("-"),
-                new exact_string_parser_t("*"),
-                new exact_string_parser_t("/"),
-                new exact_string_parser_t("%"),
-                new exact_string_parser_t("pow")
-            }),
+            new choice_of_string_parser_t({"+", "-", "*", "/", "%", "pow"}),
             new between_parser_t(
                 new whitespaces_parser_t(),
                 new whitespaces_parser_t(),
@@ -94,9 +91,13 @@ void example_1() {
     std::cout << ps.to_string() << std::endl;
 }
 
+
+// -----
+
+
 int main() {
     try {
-        example_1();
+        example_lisp();
     } catch (std::string s) {
         std::cout << s << std::endl;
     }
