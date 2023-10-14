@@ -91,7 +91,6 @@ std::optional<std::string> parser_state_t::get_error() const
     return error;
 }
 
-
 parser_state_t parser_state_t::map_result(std::function<std::any(std::any)> f) const
 {
     if (this->error.has_value())
@@ -175,6 +174,16 @@ parser_state_t parser_t::run([[maybe_unused]]parser_state_t parser_state) const
     throw "parser_t::run() should never be run on its own!";
 }
 
+parser_t* parser_t::map(std::function<std::any(std::any)> f) const
+{
+    return new map_parser_t(this, f);
+}
+
+parser_t* parser_t::chain(std::function<parser_t*(std::any)> f) const
+{
+    return new chain_parser_t(this, f);
+}
+
 
 // -----
 
@@ -195,7 +204,7 @@ lazy_parser_t::lazy_parser_t()
 : parser(nullptr)
 {}
 
-lazy_parser_t::lazy_parser_t(parser_t *_parser)
+lazy_parser_t::lazy_parser_t(const parser_t *_parser)
 : parser(_parser)
 {}
 
@@ -204,7 +213,7 @@ parser_state_t lazy_parser_t::run(parser_state_t parser_state) const
     return parser->run(parser_state);
 }
 
-lazy_parser_t& lazy_parser_t::set_parser(parser_t *_parser)
+lazy_parser_t& lazy_parser_t::set_parser(const parser_t *_parser)
 {
     parser = _parser;
     return *this;
@@ -219,7 +228,17 @@ map_parser_t::map_parser_t()
   f([](std::any a) {return a;})
 {}
 
-map_parser_t::map_parser_t(parser_t *_parser, std::function<std::any(std::any)> _f)
+map_parser_t::map_parser_t(const parser_t *_parser)
+: parser(_parser),
+  f([](std::any a) {return a;})
+{}
+
+map_parser_t::map_parser_t(std::function<std::any(std::any)> _f)
+: parser(new do_nothing_parser_t()),
+  f(_f)
+{}
+
+map_parser_t::map_parser_t(const parser_t *_parser, std::function<std::any(std::any)> _f)
 : parser(_parser),
   f(_f)
 {}
@@ -232,7 +251,7 @@ parser_state_t map_parser_t::run(parser_state_t parser_state) const
     return parser_state.map_result(f);
 }
 
-map_parser_t& map_parser_t::set_parser(parser_t *_parser)
+map_parser_t& map_parser_t::set_parser(const parser_t *_parser)
 {
     parser = _parser;
     return *this;
@@ -253,7 +272,17 @@ chain_parser_t::chain_parser_t()
   f([]([[maybe_unused]] std::any a) {return new do_nothing_parser_t();})
 {}
 
-chain_parser_t::chain_parser_t(parser_t *_parser, std::function<parser_t*(std::any)> _f)
+chain_parser_t::chain_parser_t(const parser_t *_parser)
+: parser(_parser),
+  f([]([[maybe_unused]] std::any a) {return new do_nothing_parser_t();})
+{}
+
+chain_parser_t::chain_parser_t(std::function<parser_t*(std::any)> _f)
+: parser(new do_nothing_parser_t()),
+  f(_f)
+{}
+
+chain_parser_t::chain_parser_t(const parser_t *_parser, std::function<parser_t*(std::any)> _f)
 : parser(_parser),
   f(_f)
 {}
@@ -266,7 +295,7 @@ parser_state_t chain_parser_t::run(parser_state_t parser_state) const
     return parser_state.chain(f);
 }
 
-chain_parser_t& chain_parser_t::set_parser(parser_t *_parser)
+chain_parser_t& chain_parser_t::set_parser(const parser_t *_parser)
 {
     parser = _parser;
     return *this;
@@ -286,7 +315,7 @@ flatten_parser_t::flatten_parser_t()
 : parser(nullptr)
 {}
 
-flatten_parser_t::flatten_parser_t(parser_t *_parser)
+flatten_parser_t::flatten_parser_t(const parser_t *_parser)
 : parser(_parser)
 {}
 
@@ -298,7 +327,7 @@ parser_state_t flatten_parser_t::run(parser_state_t parser_state) const
     return parser_state.flatten_result();
 }
 
-flatten_parser_t& flatten_parser_t::set_parser(parser_t *_parser)
+flatten_parser_t& flatten_parser_t::set_parser(const parser_t *_parser)
 {
     parser = _parser;
     return *this;
@@ -312,7 +341,7 @@ sequence_of_parser_t::sequence_of_parser_t()
 : parsers()
 {}
 
-sequence_of_parser_t::sequence_of_parser_t(std::vector<parser_t*> _parsers)
+sequence_of_parser_t::sequence_of_parser_t(std::vector<const parser_t*> _parsers)
 : parsers(_parsers)
 {}
 
@@ -333,16 +362,33 @@ parser_state_t sequence_of_parser_t::run(parser_state_t parser_state) const
     return parser_state.set_result(results);
 }
 
-void sequence_of_parser_t::add_parser(parser_t* parser)
+sequence_of_parser_t& sequence_of_parser_t::set_parsers(std::vector<const parser_t*> _parsers)
+{
+    parsers = _parsers;
+    return *this;
+}
+
+sequence_of_parser_t& sequence_of_parser_t::add_parser(const parser_t* parser)
 {
     parsers.push_back(parser);
+    return *this;
+}
+
+sequence_of_parser_t& sequence_of_parser_t::clear()
+{
+    parsers.clear();
+    return *this;
 }
 
 
 // -----
 
 
-choice_of_parser_t::choice_of_parser_t(std::vector<parser_t*> _parsers)
+choice_of_parser_t::choice_of_parser_t()
+: parsers()
+{}
+
+choice_of_parser_t::choice_of_parser_t(std::vector<const parser_t*> _parsers)
 : parsers(_parsers)
 {}
 
@@ -362,9 +408,31 @@ parser_state_t choice_of_parser_t::run(parser_state_t parser_state) const
         .set_error("choice_of_parser_t::run(): Unable to match with any parser the string \"" + string_at_most(parser_state.target_string, 10, parser_state.index) + "\"");
 }
 
+choice_of_parser_t& choice_of_parser_t::set_parsers(std::vector<const parser_t*> _parsers)
+{
+    parsers = _parsers;
+    return *this;
+}
+
+choice_of_parser_t& choice_of_parser_t::add_parser(const parser_t* parser)
+{
+    parsers.push_back(parser);
+    return *this;
+}
+
+choice_of_parser_t& choice_of_parser_t::clear()
+{
+    parsers.clear();
+    return *this;
+}
+
 
 // -----
 
+
+many_parser_t::many_parser_t()
+: parser(nullptr)
+{}
 
 many_parser_t::many_parser_t(const parser_t* _parser)
 : parser(_parser)
@@ -388,6 +456,20 @@ parser_state_t many_parser_t::run(parser_state_t parser_state) const
     return parser_state.set_result(results);
 }
 
+many_parser_t& many_parser_t::set_parser(const parser_t* _parser)
+{
+    parser = _parser;
+    return *this;
+}
+
+
+// -----
+
+
+many1_parser_t::many1_parser_t()
+: many_parser_t()
+{}
+
 many1_parser_t::many1_parser_t(const parser_t* _parser)
 : many_parser_t(_parser)
 {}
@@ -406,6 +488,12 @@ parser_state_t many1_parser_t::run(parser_state_t parser_state) const
     return parser_state;
 }
 
+many1_parser_t& many1_parser_t::set_parser(const parser_t* _parser)
+{
+    many_parser_t::set_parser(_parser);
+    return *this;
+}
+
 
 // -----
 
@@ -414,6 +502,12 @@ between_parser_t::between_parser_t()
 : left_parser(nullptr),
   right_parser(nullptr),
   content_parser(nullptr)
+{}
+
+between_parser_t::between_parser_t(parser_t* content_parser)
+: left_parser(nullptr),
+  right_parser(nullptr),
+  content_parser(content_parser)
 {}
 
 between_parser_t::between_parser_t(parser_t* _left_parser, parser_t* _right_parser)
@@ -579,6 +673,25 @@ parser_state_t choice_of_string_parser_t::run(parser_state_t parser_state) const
         .set_result("")
         .set_error("choice_of_string_parser_t::run(): Unable to match with any parser the string \"" + string_at_most(parser_state.target_string, 10, parser_state.index) + "\"");
 }
+
+choice_of_string_parser_t& choice_of_string_parser_t::set_words(std::vector<std::string> _words)
+{
+    words = _words;
+    return *this;
+}
+
+choice_of_string_parser_t& choice_of_string_parser_t::add_word(std::string _word)
+{
+    words.push_back(_word);
+    return *this;
+}
+
+choice_of_string_parser_t& choice_of_string_parser_t::clear()
+{
+    words.clear();
+    return *this;
+}
+
 
 
 // -----

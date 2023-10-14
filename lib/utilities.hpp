@@ -21,7 +21,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _WI_UTILITIES_HPP_
-#define _WI_UTILITIES_HPP_ "1.0.1a"
+#define _WI_UTILITIES_HPP_ "1.0.2b"
 
 #include <iostream>
 #include <sstream>

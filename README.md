@@ -16,7 +16,7 @@ A few examples should be provided in the [test.cpp](./test.cpp) file. These shou
 
 ## The API
 
-The rich API provided by the current version of the project, **1.0.2a**, will be explained in the following paragraphs
+The rich API provided by the current version of the project, **1.0.2b**, will be explained in the following paragraphs
 
 ### parser_state_t
 
@@ -32,6 +32,10 @@ The structure contains the following information:
 There are setters and getters for each of the parameters explained above.
 
 ### parser_t
+
+TODO
+
+### do_nothing_parser_t
 
 TODO
 

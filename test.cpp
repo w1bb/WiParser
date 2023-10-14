@@ -91,6 +91,57 @@ void example_lisp() {
     std::cout << ps.to_string() << std::endl;
 }
 
+// This example parses a LISP-like mathematical expression and, if the
+// expression starts with %, the result will simply be replaced.
+void example_chain() {
+    using namespace wi;
+    
+    parser_state_t init_parser_state("[% (* 2 (- [+ 8 2] (pow 2 2))) 5]");
+
+    lazy_parser_t *p_lazy_function = new lazy_parser_t();
+
+    parser_t *p_value = new choice_of_parser_t({
+        new digits_parser_t(),
+        p_lazy_function
+    });
+
+    parser_t *p_function = new between_parser_t(
+        new sequence_of_parser_t({
+            new char_parser_t(std::regex(R"([\(\[])")),
+            new maybe_whitespaces_parser_t()
+        }),
+        new sequence_of_parser_t({
+            new maybe_whitespaces_parser_t(),
+            new char_parser_t(std::regex(R"([\)\]])"))
+        }),
+        new sequence_of_parser_t({
+            new choice_of_string_parser_t({"+", "-", "*", "/", "%", "pow"}),
+            new between_parser_t(
+                new whitespaces_parser_t(),
+                new whitespaces_parser_t(),
+                p_value
+            ),
+            p_value
+        })
+    );
+
+    p_lazy_function->set_parser(p_function);
+    parser_state_t ps = p_function->chain([](std::any a) {
+        std::vector<std::any> v = std::any_cast< std::vector<std::any> >(a);
+        if (smart_string_any_cast(v[0]) == "%") {
+            return (parser_t*)new map_parser_t(
+                new do_nothing_parser_t(),
+                []([[maybe_unused]]std::any a) {
+                    return std::any("yoohoo!");
+                }
+            );
+        }
+        return (parser_t*)new do_nothing_parser_t();
+    })->run(init_parser_state);
+
+    std::cout << ps.to_string() << std::endl;
+}
+
 
 // -----
 
@@ -98,6 +149,7 @@ void example_lisp() {
 int main() {
     try {
         example_lisp();
+        example_chain();
     } catch (std::string s) {
         std::cout << s << std::endl;
     }

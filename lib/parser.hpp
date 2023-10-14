@@ -21,12 +21,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _WI_PARSER_HPP_
-#define _WI_PARSER_HPP_ "1.0.1a"
+#define _WI_PARSER_HPP_ "1.0.2b"
 
 
 namespace wi {
 class parser_state_t;
 class parser_t;
+class do_nothing_parser_t;
 class lazy_parser_t;
 class sequence_of_parser_t;
 class choice_of_parser_t;
@@ -111,6 +112,9 @@ public:
 class parser_t {
 public:
     virtual parser_state_t run(parser_state_t parser_state) const;
+
+    parser_t* map(std::function<std::any(std::any)> f) const;
+    parser_t* chain(std::function<parser_t*(std::any)> f) const;
 };
 
 
@@ -128,14 +132,14 @@ public:
 
 
 class lazy_parser_t : public parser_t {
-    parser_t *parser;
+    const parser_t *parser;
 
 public:
     lazy_parser_t();
-    lazy_parser_t(parser_t *_parser);
+    lazy_parser_t(const parser_t *_parser);
     parser_state_t run(parser_state_t parser_state) const;
 
-    lazy_parser_t& set_parser(parser_t *_parser);
+    lazy_parser_t& set_parser(const parser_t *_parser);
 };
 
 
@@ -143,16 +147,18 @@ public:
 
 
 class map_parser_t : public parser_t {
-    parser_t *parser;
+    const parser_t *parser;
     std::function<std::any(std::any)> f;
 
 public:
     map_parser_t();
-    map_parser_t(parser_t *_parser, std::function<std::any(std::any)> _f);
+    map_parser_t(const parser_t *_parser);
+    map_parser_t(std::function<std::any(std::any)> _f);
+    map_parser_t(const parser_t *_parser, std::function<std::any(std::any)> _f);
 
     parser_state_t run(parser_state_t parser_state) const;
 
-    map_parser_t& set_parser(parser_t *_parser);
+    map_parser_t& set_parser(const parser_t *_parser);
     map_parser_t& set_f(std::function<std::any(std::any)> _f);
 };
 
@@ -161,16 +167,18 @@ public:
 
 
 class chain_parser_t : public parser_t {
-    parser_t *parser;
+    const parser_t *parser;
     std::function<parser_t*(std::any)> f;
 
 public:
     chain_parser_t();
-    chain_parser_t(parser_t *_parser, std::function<parser_t*(std::any)> f);
+    chain_parser_t(const parser_t *_parser);
+    chain_parser_t(std::function<parser_t*(std::any)> f);
+    chain_parser_t(const parser_t *_parser, std::function<parser_t*(std::any)> f);
 
     parser_state_t run(parser_state_t parser_state) const;
 
-    chain_parser_t& set_parser(parser_t *_parser);
+    chain_parser_t& set_parser(const parser_t *_parser);
     chain_parser_t& set_f(std::function<parser_t*(std::any)> _f);
 };
 
@@ -179,15 +187,15 @@ public:
 
 
 class flatten_parser_t : public parser_t {
-    parser_t *parser;
+    const parser_t *parser;
 
 public:
     flatten_parser_t();
-    flatten_parser_t(parser_t *_parser);
+    flatten_parser_t(const parser_t *_parser);
 
     parser_state_t run(parser_state_t parser_state) const;
 
-    flatten_parser_t& set_parser(parser_t *_parser);
+    flatten_parser_t& set_parser(const parser_t *_parser);
 };
 
 
@@ -195,14 +203,17 @@ public:
 
 
 class sequence_of_parser_t : public parser_t {
-    std::vector<parser_t*> parsers;
+    std::vector<const parser_t*> parsers;
 
 public:
     sequence_of_parser_t();
-    sequence_of_parser_t(std::vector<parser_t*> _parsers);
+    sequence_of_parser_t(std::vector<const parser_t*> _parsers);
+
     parser_state_t run(parser_state_t parser_state) const;
 
-    void add_parser(parser_t* parser);
+    sequence_of_parser_t& set_parsers(std::vector<const parser_t*> _parsers);
+    sequence_of_parser_t& add_parser(const parser_t* parser);
+    sequence_of_parser_t& clear();
 };
 
 
@@ -210,11 +221,17 @@ public:
 
 
 class choice_of_parser_t : public parser_t {
-    std::vector<parser_t*> parsers;
+    std::vector<const parser_t*> parsers;
 
 public:
-    choice_of_parser_t(std::vector<parser_t*> _parsers);
+    choice_of_parser_t();
+    choice_of_parser_t(std::vector<const parser_t*> _parsers);
+
     parser_state_t run(parser_state_t parser_state) const;
+
+    choice_of_parser_t& set_parsers(std::vector<const parser_t*> _parsers);
+    choice_of_parser_t& add_parser(const parser_t* parser);
+    choice_of_parser_t& clear();
 };
 
 
@@ -225,17 +242,26 @@ class many_parser_t : public parser_t {
     const parser_t* parser;
 
 public:
+    many_parser_t();
     many_parser_t(const parser_t* parser);
+
     parser_state_t run(parser_state_t parser_state) const;
+
+    many_parser_t& set_parser(const parser_t* _parser);
 };
 
 
 // -----
 
+
 class many1_parser_t : public many_parser_t {
 public:
+    many1_parser_t();
     many1_parser_t(const parser_t* parser);
+
     parser_state_t run(parser_state_t parser_state) const;
+
+    many1_parser_t& set_parser(const parser_t* _parser);
 };
 
 
@@ -247,6 +273,7 @@ class between_parser_t : public parser_t {
 
 public:
     between_parser_t();
+    between_parser_t(parser_t* content_parser);
     between_parser_t(parser_t* _left_parser, parser_t* _right_parser);
     between_parser_t(parser_t* _left_parser, parser_t* _right_parser, parser_t* content_parser);
 
@@ -300,7 +327,12 @@ class choice_of_string_parser_t : public parser_t {
 public:
     choice_of_string_parser_t();
     choice_of_string_parser_t(std::vector<std::string> _words);
+
     parser_state_t run(parser_state_t parser_state) const;
+
+    choice_of_string_parser_t& set_words(std::vector<std::string> _words);
+    choice_of_string_parser_t& add_word(std::string _word);
+    choice_of_string_parser_t& clear();
 };
 
 
