@@ -26,20 +26,19 @@ namespace wi {
 // -----
 
 
-parser_state_t::parser_state_t(std::string _target_string)
-: target_string(_target_string),
-  result(""),
-  index(0),
-  is_error(false),
-  error()
-{}
-
 parser_state_t::parser_state_t()
 : target_string(),
   result(""),
   index(0),
-  is_error(false),
   error()
+{}
+
+parser_state_t::parser_state_t(std::string _target_string)
+: target_string(_target_string),
+  result(""),
+  index(0),
+  error()
+
 {}
 
 parser_state_t& parser_state_t::set_target_string(std::string _target_string)
@@ -60,37 +59,58 @@ parser_state_t& parser_state_t::set_index(std::size_t _index)
     return *this;
 }
 
-parser_state_t& parser_state_t::set_is_error(bool _is_error)
-{
-    is_error = _is_error;
-    return *this;
-}
-
 parser_state_t& parser_state_t::set_error(std::string _error)
 {
     error = _error;
     return *this;
 }
 
+parser_state_t& parser_state_t::unset_error()
+{
+    error.reset();
+    return *this;
+}
+
+std::string parser_state_t::get_target_string() const
+{
+    return target_string;
+}
+
+std::any parser_state_t::get_result() const
+{
+    return result;
+}
+
+std::size_t parser_state_t::get_index() const
+{
+    return index;
+}
+
+std::optional<std::string> parser_state_t::get_error() const
+{
+    return error;
+}
+
+
 parser_state_t parser_state_t::map_result(std::function<std::any(std::any)> f) const
 {
-    if (this->is_error)
+    if (this->error.has_value())
         return *this;
-    parser_state_t parser_state = *this; //->copy();
+    parser_state_t parser_state = *this;
     return parser_state.set_result(f(parser_state.result));
 }
 
 parser_state_t parser_state_t::map_error(std::function<std::string(std::string)> f) const
 {
-    if (!(this->is_error))
+    if (!(this->error.has_value()))
         return *this;
-    parser_state_t parser_state = *this; //->copy();
-    return parser_state.set_error(f(parser_state.error));
+    parser_state_t parser_state = *this;
+    return parser_state.set_error(f(parser_state.error.value()));
 }
 
 parser_state_t parser_state_t::map_nested_result(std::function<std::any(std::string)> f) const
 {
-    if (this->is_error)
+    if (this->error.has_value())
         return *this;
     std::function<std::any(std::any)> g = [&](std::any x) {
         if (x.type() == typeid(std::vector<std::any>)) {
@@ -107,7 +127,7 @@ parser_state_t parser_state_t::map_nested_result(std::function<std::any(std::str
 
 parser_state_t parser_state_t::chain(std::function<parser_t*(std::any)> f) const
 {
-    if (this->is_error)
+    if (this->error.has_value())
         return *this;
     parser_t* next_parser = f(this->result);
     return next_parser->run(*this);
@@ -115,7 +135,7 @@ parser_state_t parser_state_t::chain(std::function<parser_t*(std::any)> f) const
 
 parser_state_t parser_state_t::flatten_result() const
 {
-    if (this->is_error)
+    if (this->error.has_value())
         return *this;
     parser_state_t parser_state = *this;
     return parser_state.set_result(flatten_vector(parser_state.result));
@@ -136,10 +156,9 @@ std::string parser_state_t::to_string() const
     }
     ss << "  result: " << aux;
     
-    if (is_error) {
+    if (error.has_value()) {
         ss << ",\n";
-        ss << "  is_error: " << std::boolalpha << is_error << ",\n";
-        ss << "  error: \"" << error << "\" }";
+        ss << "  error: \"" << error.value() << "\" }";
     } else {
         ss << " }";
     }
@@ -207,7 +226,7 @@ map_parser_t::map_parser_t(parser_t *_parser, std::function<std::any(std::any)> 
 
 parser_state_t map_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
     parser_state = parser->run(parser_state);
     return parser_state.map_result(f);
@@ -241,7 +260,7 @@ chain_parser_t::chain_parser_t(parser_t *_parser, std::function<parser_t*(std::a
 
 parser_state_t chain_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
     parser_state = parser->run(parser_state);
     return parser_state.chain(f);
@@ -273,7 +292,7 @@ flatten_parser_t::flatten_parser_t(parser_t *_parser)
 
 parser_state_t flatten_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
     parser_state = parser->run(parser_state);
     return parser_state.flatten_result();
@@ -299,7 +318,7 @@ sequence_of_parser_t::sequence_of_parser_t(std::vector<parser_t*> _parsers)
 
 parser_state_t sequence_of_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
 
     std::vector<std::any> results;
@@ -308,7 +327,7 @@ parser_state_t sequence_of_parser_t::run(parser_state_t parser_state) const
         results.emplace_back(parser_state.result);
     }
 
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
 
     return parser_state.set_result(results);
@@ -329,18 +348,17 @@ choice_of_parser_t::choice_of_parser_t(std::vector<parser_t*> _parsers)
 
 parser_state_t choice_of_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
 
     for (auto parser : this->parsers) {
         parser_state_t next_state = parser->run(parser_state);
-        if (!next_state.is_error)
+        if (!next_state.error.has_value())
             return next_state;
     }
 
     return parser_state
         .set_result("")
-        .set_is_error(true)
         .set_error("choice_of_parser_t::run(): Unable to match with any parser the string \"" + string_at_most(parser_state.target_string, 10, parser_state.index) + "\"");
 }
 
@@ -354,14 +372,14 @@ many_parser_t::many_parser_t(const parser_t* _parser)
 
 parser_state_t many_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
 
     parser_state_t next_state;
     std::vector<std::any> results;
     do {
         next_state = parser->run(parser_state);
-        if (next_state.is_error)
+        if (next_state.error.has_value())
             break;
         parser_state = next_state;
         results.emplace_back(next_state.result);
@@ -377,12 +395,11 @@ many1_parser_t::many1_parser_t(const parser_t* _parser)
 parser_state_t many1_parser_t::run(parser_state_t parser_state) const
 {
     parser_state = many_parser_t::run(parser_state);
-    if (!parser_state.is_error) {
+    if (!parser_state.error.has_value()) {
         std::vector<std::any> results = std::any_cast< std::vector<std::any> >(parser_state.result);
         if (results.size() == 0) {
             return parser_state_t()
                 .set_result("")
-                .set_is_error(true)
                 .set_error("many1_parser_t::run(): Unable to match any inputs using given parser for the string \"" + string_at_most(parser_state.target_string, 10, parser_state.index) + "\"");
         }
     }
@@ -418,7 +435,7 @@ parser_state_t between_parser_t::run(parser_state_t parser_state) const
     sequence_of_parser.add_parser(content_parser);
     sequence_of_parser.add_parser(right_parser);
     parser_state = sequence_of_parser.run(parser_state);
-    if (!parser_state.is_error) {
+    if (!parser_state.error.has_value()) {
         std::vector<std::any> v = std::any_cast< std::vector<std::any> >(parser_state.result);
         if (v.size() == 0) {
             // TODO
@@ -450,18 +467,16 @@ separated_by_parser_t::separated_by_parser_t(parser_t* _seaparator_parser, parse
 
 parser_state_t separated_by_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
     if (seaparator_parser == nullptr) {
         return parser_state_t()
             .set_result("")
-            .set_is_error(true)
             .set_error("separated_by_parser_t::run(): seaparator_parser is NULL");
     }
     if (value_parser == nullptr) {
         return parser_state_t()
             .set_result("")
-            .set_is_error(true)
             .set_error("separated_by_parser_t::run(): value_parser is NULL");
     }
 
@@ -469,12 +484,12 @@ parser_state_t separated_by_parser_t::run(parser_state_t parser_state) const
     std::vector<std::any> results;
     do {
         parser_state_t wanted_state = value_parser->run(next_state);
-        if (wanted_state.is_error)
+        if (wanted_state.error.has_value())
             break;
         results.emplace_back(wanted_state.result);
         next_state = wanted_state;
         parser_state_t separator_state = seaparator_parser->run(next_state);
-        if (separator_state.is_error)
+        if (separator_state.error.has_value())
             break;
         next_state = separator_state;
     } while (1);
@@ -508,13 +523,12 @@ string_parser_t::string_parser_t(std::string _s)
 
 parser_state_t string_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
 
     if (parser_state.target_string.size() == 0) {
         return parser_state
             .set_result("")
-            .set_is_error(true)
             .set_error("string_parser_t::run(): Unexpected end of string");
     }
 
@@ -527,7 +541,6 @@ parser_state_t string_parser_t::run(parser_state_t parser_state) const
 
     return parser_state
         .set_result("")
-        .set_is_error(true)
         .set_error("string_parser_t::run(): Couldn't match \"" + this->s + "\" in \"" + string_at_most<true>(parser_state.target_string, 10, parser_state.index) + "\"");
 }
 
@@ -551,20 +564,19 @@ choice_of_string_parser_t::choice_of_string_parser_t(std::vector<std::string> _w
 
 parser_state_t choice_of_string_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
 
     string_parser_t parser;
 
     for (const std::string& word : this->words) {
         parser_state_t next_state = parser.set_string(word).run(parser_state);
-        if (!next_state.is_error)
+        if (!next_state.error.has_value())
             return next_state;
     }
 
     return parser_state
         .set_result("")
-        .set_is_error(true)
         .set_error("choice_of_string_parser_t::run(): Unable to match with any parser the string \"" + string_at_most(parser_state.target_string, 10, parser_state.index) + "\"");
 }
 
@@ -578,13 +590,12 @@ char_parser_t::char_parser_t(std::regex _rexp)
 
 parser_state_t char_parser_t::run(parser_state_t parser_state) const
 {
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
 
     if (parser_state.target_string.size() == 0) {
         return parser_state
             .set_result("")
-            .set_is_error(true)
             .set_error("char_parser_t::run(): Unexpected end of string");
     }
 
@@ -600,7 +611,6 @@ parser_state_t char_parser_t::run(parser_state_t parser_state) const
 
     return parser_state
         .set_result("")
-        .set_is_error(true)
         .set_error("char_parser_t::run(): Couldn't match any character TODO in \"" + string_at_most<true>(parser_state.target_string, 10, parser_state.index) + "\"");
 }
 
@@ -627,7 +637,7 @@ chars_parser_t::chars_parser_t(std::regex _rexp)
 parser_state_t chars_parser_t::run(parser_state_t parser_state) const
 {
     parser_state = many1_parser_t(&char_parser).run(parser_state);
-    if (parser_state.is_error)
+    if (parser_state.error.has_value())
         return parser_state;
     
     return parser_state.map_result(

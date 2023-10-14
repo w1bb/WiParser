@@ -57,6 +57,7 @@ class maybe_whitespaces_parser_t;
 #include "utilities.hpp"
 
 #include <functional>
+#include <optional>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -74,17 +75,23 @@ public:
     std::string target_string;
     std::any result;
     std::size_t index;
-    bool is_error;
-    std::string error;
+    std::optional<std::string> error;
 
     parser_state_t();
     parser_state_t(std::string _target_string);
 
+    // Setters
     parser_state_t& set_target_string(std::string _target_string);
     parser_state_t& set_result(std::any _result);
     parser_state_t& set_index(std::size_t _index);
-    parser_state_t& set_is_error(bool _is_error);
     parser_state_t& set_error(std::string _error);
+    parser_state_t& unset_error();
+
+    // Getters
+    std::string get_target_string() const;
+    std::any get_result() const;
+    std::size_t get_index() const;
+    std::optional<std::string> get_error() const;
 
     parser_state_t map_result(std::function<std::any(std::any)> f) const;
     parser_state_t map_nested_result(std::function<std::any(std::string)> f) const;
